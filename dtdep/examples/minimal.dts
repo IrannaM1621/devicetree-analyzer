@@ -1,0 +1,21 @@
+/dts-v1/;
+
+/ {
+    model = "Test Board";
+    compatible = "vendor,board";
+    #address-cells = <1>;
+    #size-cells = <1>;
+
+    soc {
+        spi@1000 {
+            compatible = "vendor,spi";
+            reg = <0x1000 0x100>;
+            clocks = <&gcc 5>;
+        };
+
+        uart@2000 {
+            compatible = "vendor,uart";
+            reg = <0x2000 0x100>;
+        };
+    };
+};
