@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "parser/dts_lexer.h"
+#include "model/dt_tree.h"
 #include "dtdep_err.h"
 
 int main(int argc, char *argv[])
@@ -17,20 +17,16 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    DtsLexer lex;
-    dts_lexer_init(&lex, fp);
-
-    DtsToken tok;
-    do {
-        tok = dts_lexer_next(&lex);
-        printf("%-12s '%s'",
-               dts_token_type_name(tok.type),
-               tok.text);
-        if (tok.type == TOK_NUMBER)
-            printf("  (0x%llx)", (unsigned long long)tok.numval);
-        printf("\n");
-    } while (tok.type != TOK_EOF && tok.type != TOK_ERROR);
-
+    DtTree tree;
+    int rc = dt_tree_parse(&tree, fp, argv[1]);
     fclose(fp);
+
+    if (rc != 0) {
+        fprintf(stderr, "parse failed\n");
+        return 1;
+    }
+
+    dt_tree_print(&tree);
+    dt_tree_free(&tree);
     return 0;
 }
