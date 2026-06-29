@@ -1,8 +1,5 @@
-# Build artifacts
 *.o
 dtdep
-
-# Editor temporaries
 *.swp
 *.swo
 *~
