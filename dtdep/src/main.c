@@ -3,6 +3,7 @@
 
 #include "model/dt_tree.h"
 #include "resolver/resolver.h"
+#include "graph/dep_engine.h"
 #include "dtdep_err.h"
 
 int main(int argc, char *argv[])
@@ -36,9 +37,15 @@ int main(int argc, char *argv[])
         fprintf(stderr, "warning: %d unresolved phandle reference(s)\n",
                 res.unresolved);
 
-    /* print resolved tree */
-    dt_tree_print(&tree);
+    /* Phase 4 — dependency analysis */
+    DtDepList deps;
+    dt_dep_analyze(&deps, &tree, &res);
 
+    /* print tree then dependency list */
+    dt_tree_print(&tree);
+    dt_dep_list_print(&deps);
+
+    dt_dep_list_free(&deps);
     dt_resolver_free(&res);
     dt_tree_free(&tree);
     return 0;

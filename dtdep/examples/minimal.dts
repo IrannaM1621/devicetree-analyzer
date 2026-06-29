@@ -9,18 +9,40 @@
     gcc: clk@900 {
         compatible = "vendor,clk";
         phandle = <1>;
+        #clock-cells = <1>;
+    };
+
+    gic: intc@800 {
+        compatible = "arm,gic-400";
+        phandle = <2>;
+        interrupt-controller;
+        #interrupt-cells = <3>;
+    };
+
+    dma: dma@700 {
+        compatible = "vendor,dma";
+        phandle = <3>;
+        #dma-cells = <1>;
     };
 
     soc {
+        compatible = "simple-bus";
+        #address-cells = <1>;
+        #size-cells = <1>;
+
         spi@1000 {
             compatible = "vendor,spi";
             reg = <0x1000 0x100>;
             clocks = <&gcc 5>;
+            interrupt-parent = <&gic>;
+            dmas = <&dma 1>;
         };
 
         uart@2000 {
             compatible = "vendor,uart";
             reg = <0x2000 0x100>;
+            clocks = <&gcc 3>;
+            interrupt-parent = <&gic>;
         };
     };
 };
