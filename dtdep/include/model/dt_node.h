@@ -26,6 +26,8 @@ typedef struct DtProp {
         struct {
             uint32_t cells[DT_CELLS_MAX];
             int      ncells;
+            /* parallel label for each cell that was a phandle ref */
+            char     phandle_refs[DT_CELLS_MAX][64];
         };
 
         struct {

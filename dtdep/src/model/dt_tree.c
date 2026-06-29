@@ -67,10 +67,17 @@ static DtProp *parse_cells(Parser *p, const char *name)
 
     while (p->cur.type != TOK_RANGLE && p->cur.type != TOK_EOF) {
         if (p->cur.type == TOK_AMPERSAND) {
-            /* phandle reference: &label — store sentinel, save name later */
+            /* phandle reference: &label — store sentinel + label name */
             advance(p); /* consume '&' */
-            if (prop->ncells < DT_CELLS_MAX)
-                prop->cells[prop->ncells++] = 0xffffffff;
+            if (prop->ncells < DT_CELLS_MAX) {
+                int slot = prop->ncells;
+                prop->cells[slot] = 0xffffffff;
+                if (p->cur.type == TOK_IDENT)
+                    strncpy(prop->phandle_refs[slot],
+                            p->cur.text,
+                            sizeof(prop->phandle_refs[slot]) - 1);
+                prop->ncells++;
+            }
             advance(p); /* consume label ident */
         } else if (p->cur.type == TOK_NUMBER) {
             if (prop->ncells < DT_CELLS_MAX)
@@ -221,7 +228,16 @@ static void parse_node_body(Parser *p, DtNode *node)
 
         /* collect the name (handles #address-cells etc.) */
         char name[DT_NAME_MAX] = {0};
+        char label[DT_NAME_MAX] = {0};
         collect_name(p, name, DT_NAME_MAX);
+
+        /* handle label:  gcc: clk@900 { */
+        if (p->cur.type == TOK_COLON) {
+            strncpy(label, name, DT_NAME_MAX - 1);
+            advance(p); /* consume ':' */
+            memset(name, 0, sizeof(name));
+            collect_name(p, name, DT_NAME_MAX);
+        }
 
         if (name[0] == '\0') {
             parser_error(p, "expected property or node name");
@@ -236,16 +252,22 @@ static void parse_node_body(Parser *p, DtNode *node)
             snprintf(full, sizeof(full), "%.*s@%.*s", DT_NAME_MAX/2 - 1, name, DT_NAME_MAX/2 - 1, p->cur.text);
             advance(p); /* consume address */
             DtNode *child = parse_node(p, full);
-            if (child)
+            if (child) {
+                if (label[0])
+                    strncpy(child->label, label, DT_NAME_MAX - 1);
                 dt_node_add_child(node, child);
+            }
             continue;
         }
 
         /* child node without unit address: name { */
         if (p->cur.type == TOK_LBRACE) {
             DtNode *child = parse_node(p, name);
-            if (child)
+            if (child) {
+                if (label[0])
+                    strncpy(child->label, label, DT_NAME_MAX - 1);
                 dt_node_add_child(node, child);
+            }
             continue;
         }
 

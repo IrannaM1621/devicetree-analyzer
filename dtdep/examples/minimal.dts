@@ -6,6 +6,11 @@
     #address-cells = <1>;
     #size-cells = <1>;
 
+    gcc: clk@900 {
+        compatible = "vendor,clk";
+        phandle = <1>;
+    };
+
     soc {
         spi@1000 {
             compatible = "vendor,spi";
