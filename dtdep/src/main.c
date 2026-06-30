@@ -1,49 +1,111 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
+#include "cli/cli.h"
 #include "model/dt_tree.h"
 #include "resolver/resolver.h"
 #include "graph/dep_engine.h"
+#include "graph/dep_graph.h"
 #include "dtdep_err.h"
+
+/* Count properties recursively, for the summary banner. */
+static int count_props(const DtNode *node)
+{
+    int n = 0;
+    for (const DtProp *p = node->props; p; p = p->next)
+        n++;
+    for (const DtNode *c = node->children; c; c = c->next)
+        n += count_props(c);
+    return n;
+}
+
+/* Count nodes recursively. */
+static int count_nodes(const DtNode *node)
+{
+    int n = 1;
+    for (const DtNode *c = node->children; c; c = c->next)
+        n += count_nodes(c);
+    return n;
+}
+
+/* Compute max tree depth. */
+static int tree_depth(const DtNode *node)
+{
+    int max_child = 0;
+    for (const DtNode *c = node->children; c; c = c->next) {
+        int d = tree_depth(c);
+        if (d > max_child)
+            max_child = d;
+    }
+    return 1 + max_child;
+}
 
 int main(int argc, char *argv[])
 {
-    if (argc < 2) {
-        fprintf(stderr, "usage: %s <file.dts>\n", argv[0]);
+    CliOptions opts;
+    if (cli_parse(argc, argv, &opts) != 0)
         return 1;
-    }
 
-    FILE *fp = fopen(argv[1], "r");
+    FILE *fp = fopen(opts.file, "r");
     if (!fp) {
-        perror(argv[1]);
+        perror(opts.file);
         return 1;
     }
 
-    /* Phase 2 — parse */
     DtTree tree;
-    int rc = dt_tree_parse(&tree, fp, argv[1]);
+    int rc = dt_tree_parse(&tree, fp, opts.file);
     fclose(fp);
+
     if (rc != 0) {
-        fprintf(stderr, "parse failed\n");
+        fprintf(stderr, "\u2717 Parse failed\n");
         return 1;
     }
 
-    /* Phase 3 — resolve */
     DtResolver res;
     dt_resolver_build(&res, &tree);
     dt_resolver_resolve(&res, &tree);
 
-    if (res.unresolved)
-        fprintf(stderr, "warning: %d unresolved phandle reference(s)\n",
-                res.unresolved);
-
-    /* Phase 4 — dependency analysis */
     DtDepList deps;
     dt_dep_analyze(&deps, &tree, &res);
 
-    /* print tree then dependency list */
-    dt_tree_print(&tree);
-    dt_dep_list_print(&deps);
+    DepGraph graph;
+    dep_graph_build(&graph, &tree, &deps);
+
+    /* default summary banner — this is the Phase 0 first-milestone output */
+    if (!opts.quiet) {
+        printf("\u2713 Parsed successfully\n");
+        printf("  Nodes       : %d\n", count_nodes(tree.root));
+        printf("  Properties  : %d\n", count_props(tree.root));
+        printf("  Tree depth  : %d\n", tree_depth(tree.root));
+        printf("  Dependencies: %d\n", deps.count);
+        if (res.unresolved)
+            printf("  Unresolved  : %d phandle reference(s)\n", res.unresolved);
+    }
+
+    if (opts.show_tree)
+        dt_tree_print(&tree);
+
+    if (opts.show_deps)
+        dt_dep_list_print(&deps);
+
+    if (opts.show_graph)
+        dep_graph_print(&graph);
+
+    if (opts.check_cycles) {
+        int has_cycle = dep_graph_detect_cycles(&graph);
+        printf("\nCycle check: %s\n", has_cycle ? "CYCLE FOUND" : "clean");
+    }
+
+    if (opts.depends_on[0]) {
+        DtNode *target = dt_resolver_lookup_label(&res, opts.depends_on);
+        if (!target) {
+            fprintf(stderr, "error: no node with label '%s'\n",
+                    opts.depends_on);
+        } else {
+            dep_graph_reverse_deps(&graph, target, 0);
+        }
+    }
 
     dt_dep_list_free(&deps);
     dt_resolver_free(&res);
