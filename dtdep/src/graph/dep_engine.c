@@ -48,6 +48,18 @@ static const char *cells_prop_for_type(DepType type)
  * Read the #xxx-cells value from a target node.
  * Returns 0 if not found (treat as 0 args after phandle).
  */
+static int get_cells_prop_present(const DtNode *node, const char *prop_name)
+{
+    if (!prop_name)
+        return 0;
+    for (const DtProp *p = node->props; p; p = p->next) {
+        if (strcmp(p->name, prop_name) == 0 &&
+            p->kind == PROP_CELLS && p->ncells == 1)
+            return 1;
+    }
+    return 0;
+}
+
 static int read_cells_prop(const DtNode *node, const char *prop_name)
 {
     if (!prop_name)
@@ -119,8 +131,18 @@ static void analyze_node(DtDepList *list, DtNode *node, DtResolver *res)
             if (target && target != node) {
                 dep_add(list, node, target, type, p->name);
 
-                /* skip argument cells for this phandle */
+                /*
+                 * Skip argument cells for this phandle. If the target
+                 * has no #xxx-cells property we cannot safely determine
+                 * how many argument cells follow — stop parsing the rest
+                 * of this property rather than risk reinterpreting an
+                 * argument value as another phandle (dt_check will flag
+                 * the missing #xxx-cells separately).
+                 */
                 const char *cprop = cells_prop_for_type(type);
+                if (cprop && !get_cells_prop_present(target, cprop)) {
+                    break;
+                }
                 int nargs = read_cells_prop(target, cprop);
                 i += nargs;
             }

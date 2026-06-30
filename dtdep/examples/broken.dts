@@ -1,0 +1,45 @@
+/dts-v1/;
+
+/ {
+    model = "Broken Board";
+    compatible = "vendor,board";
+    #address-cells = <1>;
+    #size-cells = <1>;
+
+    gcc: clk@900 {
+        compatible = "vendor,clk";
+        phandle = <1>;
+        #clock-cells = <1>;
+    };
+
+    unused: spare@999 {
+        compatible = "vendor,spare";
+        phandle = <9>;
+    };
+
+    dma: dma@700 {
+        compatible = "vendor,dma";
+        phandle = <3>;
+    };
+
+    rst: reset@600 {
+        compatible = "vendor,reset";
+        phandle = <4>;
+        status = "disabled";
+    };
+
+    soc {
+        compatible = "simple-bus";
+        #address-cells = <1>;
+        #size-cells = <1>;
+
+        uart@2000 {
+            compatible = "vendor,uart";
+            reg = <0x2000 0x100>;
+            interrupts = <0 21 4>;
+            clocks = <&gcc 3>;
+            dmas = <&dma 1>;
+            resets = <&rst 0>;
+        };
+    };
+};

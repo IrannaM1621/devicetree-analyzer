@@ -17,6 +17,8 @@ void cli_print_usage(const char *prog)
     printf("  --graph             print the adjacency-list graph\n");
     printf("  --check-cycles      run dependency cycle detection\n");
     printf("  --depends-on LABEL  list nodes that depend on LABEL\n");
+    printf("  --format FORMAT     output format: text (default), dot, or html\n");
+    printf("  --check             run structural analysis for driver-breaking issues\n");
     printf("  --quiet             suppress the summary banner\n");
     printf("  --help              show this message\n");
 }
@@ -24,13 +26,13 @@ void cli_print_usage(const char *prog)
 int cli_parse(int argc, char *argv[], CliOptions *opts)
 {
     memset(opts, 0, sizeof(*opts));
+    opts->format = FORMAT_TEXT;
 
     if (argc < 3) {
         cli_print_usage(argv[0]);
         return -1;
     }
 
-    /* argv[1] must be the "parse" subcommand for now */
     if (strcmp(argv[1], "parse") != 0) {
         fprintf(stderr, "error: unknown command '%s'\n", argv[1]);
         cli_print_usage(argv[0]);
@@ -45,20 +47,18 @@ int cli_parse(int argc, char *argv[], CliOptions *opts)
         {"graph",         no_argument,       0, 'g'},
         {"check-cycles",  no_argument,       0, 'c'},
         {"depends-on",    required_argument, 0, 'r'},
+        {"format",        required_argument, 0, 'f'},
+        {"check",         no_argument,       0, 'k'},
         {"quiet",         no_argument,       0, 'q'},
         {"help",          no_argument,       0, 'h'},
         {0, 0, 0, 0}
     };
 
-    /*
-     * Shift argv so getopt_long sees options starting after the
-     * "parse <file>" positional args already consumed above.
-     */
     int shifted_argc = argc - 2;
     char **shifted_argv = argv + 2;
 
     int c;
-    optind = 1; /* reset getopt state */
+    optind = 1;
     while ((c = getopt_long(shifted_argc, shifted_argv, "",
                              long_opts, NULL)) != -1) {
         switch (c) {
@@ -69,6 +69,19 @@ int cli_parse(int argc, char *argv[], CliOptions *opts)
         case 'r':
             strncpy(opts->depends_on, optarg, sizeof(opts->depends_on) - 1);
             break;
+        case 'f':
+            if (strcmp(optarg, "dot") == 0) {
+                opts->format = FORMAT_DOT;
+            } else if (strcmp(optarg, "html") == 0) {
+                opts->format = FORMAT_HTML;
+            } else if (strcmp(optarg, "text") == 0) {
+                opts->format = FORMAT_TEXT;
+            } else {
+                fprintf(stderr, "error: unknown format '%s'\n", optarg);
+                return -1;
+            }
+            break;
+        case 'k': opts->check = 1; break;
         case 'q': opts->quiet = 1; break;
         case 'h':
             cli_print_usage(argv[0]);

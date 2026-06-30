@@ -7,9 +7,13 @@
 #include "resolver/resolver.h"
 #include "graph/dep_engine.h"
 #include "graph/dep_graph.h"
+#include "exporters/export_dot.h"
+#include "exporters/export_html.h"
+#include "graph/dt_check.h"
+#include "exporters/export_html.h"
+#include "graph/dt_check.h"
 #include "dtdep_err.h"
 
-/* Count properties recursively, for the summary banner. */
 static int count_props(const DtNode *node)
 {
     int n = 0;
@@ -20,7 +24,6 @@ static int count_props(const DtNode *node)
     return n;
 }
 
-/* Count nodes recursively. */
 static int count_nodes(const DtNode *node)
 {
     int n = 1;
@@ -29,7 +32,6 @@ static int count_nodes(const DtNode *node)
     return n;
 }
 
-/* Compute max tree depth. */
 static int tree_depth(const DtNode *node)
 {
     int max_child = 0;
@@ -72,7 +74,23 @@ int main(int argc, char *argv[])
     DepGraph graph;
     dep_graph_build(&graph, &tree, &deps);
 
-    /* default summary banner — this is the Phase 0 first-milestone output */
+    /* DOT/HTML formats short-circuit everything else — pure graph output */
+    if (opts.format == FORMAT_DOT) {
+        dot_export(&graph, stdout);
+        dt_dep_list_free(&deps);
+        dt_resolver_free(&res);
+        dt_tree_free(&tree);
+        return 0;
+    }
+
+    if (opts.format == FORMAT_HTML) {
+        html_export(&graph, &res, stdout);
+        dt_dep_list_free(&deps);
+        dt_resolver_free(&res);
+        dt_tree_free(&tree);
+        return 0;
+    }
+
     if (!opts.quiet) {
         printf("\u2713 Parsed successfully\n");
         printf("  Nodes       : %d\n", count_nodes(tree.root));
@@ -95,6 +113,13 @@ int main(int argc, char *argv[])
     if (opts.check_cycles) {
         int has_cycle = dep_graph_detect_cycles(&graph);
         printf("\nCycle check: %s\n", has_cycle ? "CYCLE FOUND" : "clean");
+    }
+
+    if (opts.check) {
+        DtFindingList findings;
+        dt_check_run(&findings, &tree, &res, &deps, &graph);
+        dt_check_print(&findings);
+        dt_check_free(&findings);
     }
 
     if (opts.depends_on[0]) {
